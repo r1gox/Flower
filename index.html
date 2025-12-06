@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Registro Nacional de Infieles</title>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
     <style>
         :root {
             --azul: #007bff;
@@ -26,7 +29,7 @@
             min-height: 100vh;
         }
 
-        /* Solo en PC: bloquea todo */
+        /* Solo en PC */
         #solo-pc {
             display: none;
             text-align: center;
@@ -67,6 +70,7 @@
         }
         .btn-azul { background: var(--azul); color: white; }
         .btn-rojo { background: var(--rojo); color: white; }
+        .btn-disabled { background: #ccc !important; cursor: not-allowed !important; }
 
         #search-section {
             padding: 25px 15px;
@@ -155,7 +159,6 @@
             z-index: 10;
         }
 
-        /* IMÁGENES 100% RESPONSIVE */
         .galeria img, .comentario img {
             width: 100% !important;
             height: auto !important;
@@ -266,7 +269,7 @@
         </div>
     </div>
 
-    <!-- Modal Detalle + Comentarios + Votos -->
+    <!-- Modal Detalle -->
     <div id="modal-chisme" class="modal">
         <div class="modal-content">
             <span class="close" onclick="cerrarDetalle()">&times;</span>
@@ -294,11 +297,23 @@
     </div>
 
     <script>
-        // Bloqueo en PC
-        if (window.innerWidth >= 768) {
-            document.getElementById('main-content').style.display = 'none';
-            document.getElementById('age-modal').style.display = 'none';
-        }
+        // REPLACE WITH YOUR FIREBASE CONFIG (de Firebase Console > Project Settings > General > Your apps > Config)
+        const firebaseConfig = {
+            apiKey: "AIzaSyA0BbcZ-XSsZSEnl404Is24OJqeR0YXztg",
+            authDomain: "dbs-infieles.firebaseapp.com",
+            projectId: "dbs-infieles",
+            storageBucket: "dbs-infieles.firebasestorage.app",
+            messagingSenderId: "149189226496",
+            appId: "1:149189226496:web:448ba9cbdffe3e2636a8e5",
+            measurementId: "G-ED2FCGLQ4K"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        const auth = firebase.auth();
+
+        // Auth anónima automática
+        auth.signInAnonymously().catch(console.error);
 
         function confirmAge(ok) {
             if (ok) {
@@ -312,22 +327,21 @@
 
         document.getElementById('btn-agregar').onclick = () => document.getElementById('modal-form').classList.add('active');
         document.getElementById('btn-legal').onclick = () => document.getElementById('modal-legal').classList.add('active');
+
         function cerrarLegal() { document.getElementById('modal-legal').classList.remove('active'); }
         function cerrarModal() { document.getElementById('modal-form').classList.remove('active'); document.getElementById('form-infiel').reset(); }
         function cerrarDetalle() { document.getElementById('modal-chisme').classList.remove('active'); }
 
-        // Publicar chisme
         document.getElementById('form-infiel').onsubmit = async e => {
             e.preventDefault();
             const files = document.getElementById('pruebas').files;
             const imgs = [];
             for (let f of files) if (f.type.startsWith('image/')) imgs.push(await fileToBase64(f));
             const nuevo = {
-                id: Date.now(),
                 reportero: document.getElementById('reportero').value.trim() || 'Anónimo',
                 nombre: document.getElementById('nombre').value.trim(),
                 apellido: document.getElementById('apellido').value.trim(),
-                edad: document.getElementById('edad').value,
+                edad: Number(document.getElementById('edad').value),
                 ubicacion: document.getElementById('ubicacion').value.trim(),
                 historia: document.getElementById('historia').value.trim(),
                 imagenes: imgs,
@@ -335,10 +349,9 @@
                 votos: {aprobar:0, refutar:0, denunciar:0},
                 comentarios: []
             };
-            let lista = JSON.parse(localStorage.getItem('infieles') || '[]');
-            lista.unshift(nuevo);
-            localStorage.setItem('infieles', JSON.stringify(lista));
-            cerrarModal(); cargarInfieles();
+            await db.collection('infieles').add(nuevo);
+            cerrarModal();
+            cargarInfieles();
             alert('¡Chisme publicado!');
         };
 
@@ -350,15 +363,17 @@
             });
         }
 
-        function cargarInfieles() {
+        async function cargarInfieles() {
             const cont = document.getElementById('lista-infieles');
-            const lista = JSON.parse(localStorage.getItem('infieles') || '[]');
-            if (!lista.length) {
+            const snapshot = await db.collection('infieles').orderBy('fecha', 'desc').get();
+            if (snapshot.empty) {
                 cont.innerHTML = '<p style="text-align:center;padding:60px;color:#666;font-size:1.1em;">Aún no hay chismes...<br><strong>¡Sé el primero en exponer!</strong></p>';
                 return;
             }
             cont.innerHTML = '';
-            lista.forEach(i => {
+            snapshot.forEach(doc => {
+                const i = doc.data();
+                const id = doc.id;
                 const card = document.createElement('div');
                 card.className = 'card';
                 card.innerHTML = `
@@ -366,8 +381,8 @@
                     <div class="card-body">
                         <div class="info"><strong>Reportado por:</strong> ${i.reportero}</div>
                         <div class="info"><strong>De:</strong> ${i.ubicacion}</div>
-                        <button class="btn-ver" onclick="verChisme(${i.id})">
-                            Ver todo el chisme ${i.imagenes.length ? `(${i.imagenes.length} fotos)` : ''}
+                        <button class="btn-ver" onclick="verChisme('${id}')">
+                            Ver todo el chisme ${i.imagenes ? `(${i.imagenes.length} fotos)` : ''}
                         </button>
                     </div>
                 `;
@@ -375,19 +390,22 @@
             });
         }
 
-        function verChisme(id) {
-            const infiel = JSON.parse(localStorage.getItem('infieles') || '[]').find(x => x.id === id);
+        async function verChisme(id) {
+            const doc = await db.collection('infieles').doc(id).get();
+            const infiel = doc.data();
             if (!infiel) return;
 
-            const galeria = infiel.imagenes.length ? infiel.imagenes.map(src => `<img src="${src}">`).join('') : '<p style="color:#888;">Sin pruebas visuales</p>';
+            const galeria = infiel.imagenes && infiel.imagenes.length ? infiel.imagenes.map(src => `<img src="${src}">`).join('') : '<p style="color:#888;">Sin pruebas visuales</p>';
 
-            const coms = infiel.comentarios.length ? infiel.comentarios.map(c => `
+            const coms = infiel.comentarios && infiel.comentarios.length ? infiel.comentarios.map(c => `
                 <div class="comentario">
                     <strong>${c.nick || 'Anónimo'}:</strong> ${c.texto.replace(/\n/g, '<br>')}
                     ${c.img ? `<img src="${c.img}">` : ''}
                     <small style="color:#888;">${c.fecha}</small>
                 </div>
             `).join('') : '<p style="color:#888;">Aún no hay comentarios</p>';
+
+            const hasVoted = localStorage.getItem('voted_' + id) === 'true';
 
             document.getElementById('detalle-chisme').innerHTML = `
                 <h2>${infiel.nombre} ${infiel.apellido}</h2>
@@ -399,10 +417,11 @@
                 <div class="galeria">${galeria}</div>
 
                 <div class="votos">
-                    <button class="voto-btn" style="background:#28a745;" onclick="votar(${id},'aprobar')">Aprobar (${infiel.votos.aprobar})</button>
-                    <button class="voto-btn" style="background:#ffc107;color:black;" onclick="votar(${id},'refutar')">Refutar (${infiel.votos.refutar})</button>
-                    <button class="voto-btn" style="background:#dc3545;" onclick="votar(${id},'denunciar')">Denunciar (${infiel.votos.denunciar})</button>
+                    <button class="voto-btn ${hasVoted ? 'btn-disabled' : ''}" style="background:#28a745;" ${hasVoted ? 'disabled' : `onclick="votar('${id}','aprobar')"`}>Aprobar (${infiel.votos.aprobar || 0})</button>
+                    <button class="voto-btn ${hasVoted ? 'btn-disabled' : ''}" style="background:#ffc107;color:black;" ${hasVoted ? 'disabled' : `onclick="votar('${id}','refutar')"`}>Refutar (${infiel.votos.refutar || 0})</button>
+                    <button class="voto-btn ${hasVoted ? 'btn-disabled' : ''}" style="background:#dc3545;" ${hasVoted ? 'disabled' : `onclick="votar('${id}','denunciar')"`}>Denunciar (${infiel.votos.denunciar || 0})</button>
                 </div>
+                ${hasVoted ? '<p style="text-align:center;color:#888;">Ya votaste en este chisme</p>' : ''}
 
                 <div class="comentarios">
                     <h3>Comentarios y más pruebas</h3>
@@ -410,17 +429,19 @@
                     <input type="text" id="nick-coment" placeholder="Tu nick (opcional)" style="margin:10px 0;">
                     <textarea id="texto-coment" placeholder="Escribe tu comentario o aporta más chisme..." rows="3"></textarea>
                     <input type="file" id="img-coment" accept="image/*" style="margin:10px 0;">
-                    <button class="btn btn-azul" onclick="enviarComentario(${id})">Enviar Comentario</button>
+                    <button class="btn btn-azul" onclick="enviarComentario('${id}')">Enviar Comentario</button>
                 </div>
             `;
             document.getElementById('modal-chisme').classList.add('active');
         }
 
-        function votar(id, tipo) {
-            let lista = JSON.parse(localStorage.getItem('infieles') || '[]');
-            const infiel = lista.find(x => x.id === id);
-            if (infiel) infiel.votos[tipo]++;
-            localStorage.setItem('infieles', JSON.stringify(lista));
+        async function votar(id, tipo) {
+            if (localStorage.getItem('voted_' + id) === 'true') return alert('Ya votaste en este chisme');
+            const ref = db.collection('infieles').doc(id);
+            await ref.update({
+                [`votos.${tipo}`]: firebase.firestore.FieldValue.increment(1)
+            });
+            localStorage.setItem('voted_' + id, 'true');
             verChisme(id);
         }
 
@@ -432,10 +453,12 @@
             let img = null;
             if (file && file.type.startsWith('image/')) img = await fileToBase64(file);
 
-            let lista = JSON.parse(localStorage.getItem('infieles') || '[]');
-            const infiel = lista.find(x => x.id === id);
-            infiel.comentarios.push({nick, texto, img, fecha: new Date().toLocaleDateString('es-ES')});
-            localStorage.setItem('infieles', JSON.stringify(lista));
+            const ref = db.collection('infieles').doc(id);
+            await ref.update({
+                comentarios: firebase.firestore.FieldValue.arrayUnion({
+                    nick, texto, img, fecha: new Date().toLocaleDateString('es-ES')
+                })
+            });
             verChisme(id);
             document.getElementById('texto-coment').value = '';
             document.getElementById('img-coment').value = '';
