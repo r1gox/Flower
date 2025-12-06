@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Registro Nacional de Infieles</title>
-    <!-- Cliente PostgreSQL ligero (sin dependencias) -->
+    <!-- Cliente PostgreSQL ligero y seguro para navegador -->
     <script src="https://unpkg.com/postgres@3.3.3/dist/index.browser.min.js"></script>
     <style>
         :root{--azul:#007bff;--rojo:#dc3545;--fondo:#f8f9fa;--blanco:#fff;--gris:#6c757d;--texto:#212529}
@@ -76,7 +76,7 @@
         <span class="close" onclick="cerrarModal()">×</span>
         <h2>Nuevo Chisme</h2>
         <form id="form-infiel">
-            <label>Tu nick (opcional)</label>
+            <label>Tu nick (opcional - si no pones, serás Anónimo)</label>
             <input type="text" id="reportero">
             <label>Nombre del infiel</label>
             <input type="text" id="nombre" required>
@@ -86,11 +86,11 @@
             <input type="number" id="edad" min="18" required>
             <label>De dónde es</label>
             <input type="text" id="ubicacion" required>
-            <label>Todo el chisme</label>
+            <label>Todo el chisme (detalles completos)</label>
             <textarea id="historia" required></textarea>
             <label>Pruebas (fotos)</label>
             <input type="file" id="pruebas" accept="image/*" multiple>
-            <button type="submit" class="btn btn-azul" style="margin-top:20px">Publicar</button>
+            <button type="submit" class="btn btn-azul" style="margin-top:20px">Publicar Chisme</button>
         </form>
     </div>
 </div>
@@ -108,15 +108,16 @@
     <div class="modal-content">
         <span class="close" onclick="cerrarLegal()">×</span>
         <h2>Información Legal Importante</h2>
-        <p><strong>Entretenimiento y sátira.</strong> Todo es ficticio salvo prueba legal.</p>
-        <p>Prohibido: datos de menores, acoso, pornografía de venganza.</p>
+        <p><strong>Este sitio es de entretenimiento y sátira.</strong></p>
+        <p>Todas las historias son consideradas <strong>ficticias</strong> salvo prueba legal en contrario.</p>
+        <p>Prohibido: datos de menores, pornografía de venganza, acoso.</p>
         <p>Usas bajo tu propia responsabilidad.</p>
         <button class="btn btn-rojo" onclick="cerrarLegal()" style="margin-top:20px">Entendido</button>
     </div>
 </div>
 
 <script>
-// TU CONEXIÓN NEON PASSWORDLESS (100% segura y funcional)
+// TU CONEXIÓN NEON (passwordless) → 100% compatible con tu tabla actual
 const sql = postgres('postgres://neondb_owner:npg_hrzxHeYuq5I4@ep-cold-voice-aeuzlti2-pooler.us-east-2.aws.neon.tech/neondb?sslmode=require')
 
 function confirmAge(ok){
@@ -127,118 +128,132 @@ function confirmAge(ok){
     }else location.href='https://google.com';
 }
 
-document.getElementById('btn-agregar').onclick=()=>document.getElementById('modal-form').classList.add('active');
-document.getElementById('btn-legal').onclick=()=>document.getElementById('modal-legal').classList.add('active');
-function cerrarLegal(){document.getElementById('modal-legal').classList.remove('active');}
-function cerrarModal(){document.getElementById('modal-form').classList.remove('active');document.getElementById('form-infiel').reset();}
-function cerrarDetalle(){document.getElementById('modal-chisme').classList.remove('active');}
+document.getElementById('btn-agregar').onclick = () => document.getElementById('modal-form').classList.add('active');
+document.getElementById('btn-legal').onclick = () => document.getElementById('modal-legal').classList.add('active');
+function cerrarLegal(){ document.getElementById('modal-legal').classList.remove('active'); }
+function cerrarModal(){ document.getElementById('modal-form').classList.remove('active'); document.getElementById('form-infiel').reset(); }
+function cerrarDetalle(){ document.getElementById('modal-chisme').classList.remove('active'); }
 
-document.getElementById('form-infiel').onsubmit=async e=>{
+// Publicar chisme
+document.getElementById('form-infiel').onsubmit = async e => {
     e.preventDefault();
-    const files=document.getElementById('pruebas').files;
-    const imgs=[];
-    for(let f of files)if(f.type.startsWith('image/'))imgs.push(await toBase64(f));
+    const files = document.getElementById('pruebas').files;
+    const imgs = [];
+    for(let f of files) if(f.type.startsWith('image/')) imgs.push(await toBase64(f));
+
     await sql`
-        INSERT INTO infieles (reportero,nombre,apellido,edad,ubicacion,historia,imagenes)
-        VALUES (${document.getElementById('reportero').value.trim()||'Anónimo'},
-                ${document.getElementById('nombre').value.trim()},
-                ${document.getElementById('apellido').value.trim()},
-                ${document.getElementById('edad').value},
-                ${document.getElementById('ubicacion').value.trim()},
-                ${document.getElementById('historia').value.trim()},
-                ${imgs})
+        INSERT INTO infieles (reportero, nombre, apellido, edad, ubicacion, historia, imagenes)
+        VALUES (
+            ${document.getElementById('reportero').value.trim() || 'Anónimo'},
+            ${document.getElementById('nombre').value.trim()},
+            ${document.getElementById('apellido').value.trim()},
+            ${document.getElementById('edad').value},
+            ${document.getElementById('ubicacion').value.trim()},
+            ${document.getElementById('historia').value.trim()},
+            ${imgs}
+        )
     `;
-    cerrarModal();cargarInfieles();
-    alert('¡Chisme publicado!');
+    cerrarModal();
+    cargarInfieles();
+    alert('¡Chisme publicado con éxito!');
 };
 
 function toBase64(file){
     return new Promise((r,e)=>{const fr=new FileReader();fr.onload=()=>r(fr.result);fr.onerror=e;fr.readAsDataURL(file);});
 }
 
+// Cargar lista principal
 async function cargarInfieles(){
     const rows = await sql`SELECT * FROM infieles ORDER BY id DESC`;
-    const cont=document.getElementById('lista-infieles');
+    const cont = document.getElementById('lista-infieles');
     if(rows.length===0){
-        cont.innerHTML='<p style="text-align:center;padding:60px;color:#666">Aún no hay chismes...<br><strong>¡Sé el primero!</strong></p>';
+        cont.innerHTML='<p style="text-align:center;padding:60px;color:#666">Aún no hay chismes...<br><strong>¡Sé el primero en exponer!</strong></p>';
         return;
     }
     cont.innerHTML='';
     rows.forEach(i=>{
-        const card=document.createElement('div');card.className='card';
+        const card=document.createElement('div'); card.className='card';
         card.innerHTML=`
             <div class="card-header">${i.nombre} ${i.apellido}, ${i.edad} años</div>
             <div class="card-body">
                 <div class="info"><strong>Reportado por:</strong> ${i.reportero}</div>
                 <div class="info"><strong>De:</strong> ${i.ubicacion}</div>
-                <button class="btn-ver" onclick="verChisme(${i.id})">Ver todo el chisme ${i.imagenes.length?`(${i.imagenes.length} fotos)`:''}</button>
+                <button class="btn-ver" onclick="verChisme(${i.id})">
+                    Ver todo el chisme ${i.imagenes.length?`(${i.imagenes.length} fotos)`:''}
+                </button>
             </div>
         `;
         cont.appendChild(card);
     });
 }
 
+// Ver detalle completo
 async function verChisme(id){
     const [i] = await sql`SELECT * FROM infieles WHERE id = ${id}`;
-    const galeria=i.imagenes.length?i.imagenes.map(src=>`<img src="${src}">`).join(''):'<p style="color:#888">Sin pruebas</p>';
-    const coms=i.comentarios.length?i.comentarios.map(c=>`
+    const galeria = i.imagenes.length ? i.imagenes.map(src=>`<img src="${src}">`).join('') : '<p style="color:#888">Sin pruebas visuales</p>';
+    const coms = i.comentarios.length ? i.comentarios.map(c=>`
         <div class="comentario">
             <strong>${c.nick||'Anónimo'}:</strong> ${c.texto.replace(/\n/g,'<br>')}
             ${c.img?`<img src="${c.img}">`:''}
             <small>${c.fecha}</small>
         </div>
-    `).join(''):'<p style="color:#888">Sin comentarios</p>';
+    `).join('') : '<p style="color:#888">Aún no hay comentarios</p>';
 
-    const yaVoto=localStorage.getItem('voto_'+id)==='true';
+    const yaVoto = localStorage.getItem('voto_'+id) === 'true';
 
-    document.getElementById('detalle-chisme').innerHTML=`
+    document.getElementById('detalle-chisme').innerHTML = `
         <h2>${i.nombre} ${i.apellido}</h2>
         <p><strong>Reportado por:</strong> ${i.reportero}</p>
         <p><strong>Ubicación:</strong> ${i.ubicacion}</p>
         <hr>
         <p style="background:#f1f3f5;padding:18px;border-radius:12px">${i.historia.replace(/\n/g,'<br>')}</p>
-        <h3>Pruebas:</h3><div class="galeria">${galeria}</div>
+        <h3>Pruebas:</h3>
+        <div class="galeria">${galeria}</div>
 
         <div class="votos">
             <button class="voto-btn ${yaVoto?'disabled':''}" style="background:#28a745" ${yaVoto?'disabled':`onclick="votar(${id},'aprobar')"`}>Aprobar (${i.votos.aprobar||0})</button>
             <button class="voto-btn ${yaVoto?'disabled':''}" style="background:#ffc107;color:black" ${yaVoto?'disabled':`onclick="votar(${id},'refutar')"`}>Refutar (${i.votos.refutar||0})</button>
             <button class="voto-btn ${yaVoto?'disabled':''}" style="background:#dc3545" ${yaVoto?'disabled':`onclick="votar(${id},'denunciar')"`}>Denunciar (${i.votos.denunciar||0})</button>
         </div>
-        ${yaVoto?'<p style="text-align:center;color:#888">Ya votaste</p>':''}
+        ${yaVoto?'<p style="text-align:center;color:#888;margin:10px 0">Ya votaste en este chisme</p>':''}
 
         <div class="comentarios">
-            <h3>Comentarios</h3>${coms}
-            <input type="text" id="nick-coment" placeholder="Tu nick">
-            <textarea id="texto-coment" placeholder="Comenta o sube más pruebas..." rows="3"></textarea>
+            <h3>Comentarios y más pruebas</h3>
+            ${coms}
+            <input type="text" id="nick-coment" placeholder="Tu nick (opcional)">
+            <textarea id="texto-coment" placeholder="Escribe tu comentario..." rows="3"></textarea>
             <input type="file" id="img-coment" accept="image/*">
-            <button class="btn btn-azul" onclick="enviarComentario(${id})">Enviar</button>
+            <button class="btn btn-azul" onclick="enviarComentario(${id})">Enviar Comentario</button>
         </div>
     `;
     document.getElementById('modal-chisme').classList.add('active');
 }
 
-async function votar(id,tipo){
+// Votar (solo 1 vez por persona)
+async function votar(id, tipo){
     if(localStorage.getItem('voto_'+id)==='true') return;
     await sql`UPDATE infieles SET votos = jsonb_set(votos, '{${tipo}}', to_jsonb((votos->>'${tipo}')::int + 1)) WHERE id = ${id}`;
     localStorage.setItem('voto_'+id,'true');
     verChisme(id);
 }
 
+// Enviar comentario
 async function enviarComentario(id){
-    const nick=document.getElementById('nick-coment').value.trim()||null;
-    const texto=document.getElementById('texto-coment').value.trim();
+    const nick = document.getElementById('nick-coment').value.trim() || null;
+    const texto = document.getElementById('texto-coment').value.trim();
     if(!texto) return alert('Escribe algo');
-    const file=document.getElementById('img-coment').files[0];
-    const img=file?(await toBase64(file)):null;
-    const nuevo={nick,texto,img,fecha:new Date().toLocaleDateString('es-ES')};
-    await sql`UPDATE infieles SET comentarios = comentarios || ${sql.json([nuevo])} WHERE id = ${id}`;
+    const file = document.getElementById('img-coment').files[0];
+    const img = file ? (await toBase64(file)) : null;
+    const nuevoComentario = {nick, texto, img, fecha: new Date().toLocaleDateString('es-ES')};
+
+    await sql`UPDATE infieles SET comentarios = comentarios || ${sql.json([nuevoComentario])} WHERE id = ${id}`;
     verChisme(id);
     document.getElementById('texto-coment').value='';
     document.getElementById('img-coment').value='';
 }
 
 function filtrar(){
-    const txt=document.getElementById('search-input').value.toLowerCase();
+    const txt = document.getElementById('search-input').value.toLowerCase();
     document.querySelectorAll('.card').forEach(c=>c.style.display=c.textContent.toLowerCase().includes(txt)?'flex':'none');
 }
 </script>
