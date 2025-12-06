@@ -1,0 +1,7 @@
+{
+  "name": "registro-infieles",
+  "private": true,
+  "dependencies": {
+    "@netlify/neon": "^1.0.0"
+  }
+}
