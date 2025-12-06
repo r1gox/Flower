@@ -1,10 +1,12 @@
 import { neon } from "@netlify/neon";
 
+const sql = neon(); // usa NETLIFY_DATABASE_URL automático
+
 export default async (req) => {
   try {
-    const sql = neon(); // ✅ Se crea dentro de la función (mejores conexiones)
 
-    if (req.method === "GET") {
+    // ✅ OBTENER TODOS LOS CHISMES
+    if (req.method === "GET" && !req.queryStringParameters?.id) {
       const rows = await sql`
         SELECT * FROM infieles
         ORDER BY id DESC
@@ -12,27 +14,37 @@ export default async (req) => {
       return Response.json(rows);
     }
 
+    // ✅ OBTENER UN SOLO CHISME POR ID
+    if (req.method === "GET" && req.queryStringParameters?.id) {
+      const { id } = req.queryStringParameters;
+
+      const [row] = await sql`
+        SELECT * FROM infieles WHERE id = ${id}
+      `;
+
+      if (!row) {
+        return new Response("No encontrado", { status: 404 });
+      }
+
+      return Response.json(row);
+    }
+
+    // ✅ INSERTAR NUEVO CHISME
     if (req.method === "POST") {
       const data = await req.json();
 
       await sql`
-        INSERT INTO infieles (
-          reportero,
-          nombre,
-          apellido,
-          edad,
-          ubicacion,
-          historia,
-          imagenes
-        )
-        VALUES (
+        INSERT INTO infieles
+        (reportero, nombre, apellido, edad, ubicacion, historia, imagenes)
+        VALUES
+        (
           ${data.reportero},
           ${data.nombre},
           ${data.apellido},
           ${data.edad},
           ${data.ubicacion},
           ${data.historia},
-          ${data.imagenes}
+          ${JSON.stringify(data.imagenes)}
         )
       `;
 
@@ -42,12 +54,7 @@ export default async (req) => {
     return new Response("Método no permitido", { status: 405 });
 
   } catch (err) {
-    return new Response(JSON.stringify({
-      ok: false,
-      error: err.message
-    }), { 
-      status: 500,
-      headers: { "Content-Type": "application/json" }
-    });
+    console.error(err);
+    return new Response(err.message, { status: 500 });
   }
 };
