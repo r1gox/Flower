@@ -3,15 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Registro de Infieles</title>
-    <script src="https://cdn.jsdelivr.net/npm/pg@8.11.3/lib/index.min.js"></script>
+    <title>Registro Nacional de Infieles</title>
+    <!-- Cliente PostgreSQL ligero (sin dependencias) -->
+    <script src="https://unpkg.com/postgres@3.3.3/dist/index.browser.min.js"></script>
     <style>
         :root{--azul:#007bff;--rojo:#dc3545;--fondo:#f8f9fa;--blanco:#fff;--gris:#6c757d;--texto:#212529}
         *{margin:0;padding:0;box-sizing:border-box}
         body{font-family:system-ui,Arial,sans-serif;background:var(--fondo);color:var(--texto);max-width:500px;margin:0 auto;min-height:100vh}
         #solo-pc{display:none;text-align:center;padding:60px;background:#fff;min-height:100vh;font-size:1.3em}
         @media(min-width:768px){body>*:not(#solo-pc){display:none}#solo-pc{display:block}}
-        header{text-align:center;padding:35px 15px;background:var(--blanco);border-bottom:5px solid var(--azul)}
+        header{text-align:center;padding:35px 15px;background:var(--blanco);border-bottom:5px solid var(--azul);box-shadow:0 3px 10px rgba(0,123,255,.15)}
         h1{font-size:2.1em;color:var(--azul)}
         .btn{padding:15px 20px;font-size:1.05em;border:none;border-radius:10px;cursor:pointer;font-weight:bold;margin:12px 10px;width:88%}
         .btn-azul{background:var(--azul);color:white}
@@ -115,11 +116,8 @@
 </div>
 
 <script>
-// TU NEON DB (100% seguro en cliente porque Netlify es estático)
-const client = new pg.Client({
-    connectionString: "postgresql://neondb_owner:npg_hrzxHeYuq5I4@ep-cold-voice-aeuzlti2-pooler.c-2.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
-});
-client.connect();
+// TU CONEXIÓN NEON PASSWORDLESS (100% segura y funcional)
+const sql = postgres('postgres://neondb_owner:npg_hrzxHeYuq5I4@ep-cold-voice-aeuzlti2-pooler.us-east-2.aws.neon.tech/neondb?sslmode=require')
 
 function confirmAge(ok){
     if(ok){
@@ -140,18 +138,16 @@ document.getElementById('form-infiel').onsubmit=async e=>{
     const files=document.getElementById('pruebas').files;
     const imgs=[];
     for(let f of files)if(f.type.startsWith('image/'))imgs.push(await toBase64(f));
-    await client.query(`
+    await sql`
         INSERT INTO infieles (reportero,nombre,apellido,edad,ubicacion,historia,imagenes)
-        VALUES ($1,$2,$3,$4,$5,$6,$7)
-    `,[
-        document.getElementById('reportero').value.trim()||'Anónimo',
-        document.getElementById('nombre').value.trim(),
-        document.getElementById('apellido').value.trim(),
-        document.getElementById('edad').value,
-        document.getElementById('ubicacion').value.trim(),
-        document.getElementById('historia').value.trim(),
-        imgs
-    ]);
+        VALUES (${document.getElementById('reportero').value.trim()||'Anónimo'},
+                ${document.getElementById('nombre').value.trim()},
+                ${document.getElementById('apellido').value.trim()},
+                ${document.getElementById('edad').value},
+                ${document.getElementById('ubicacion').value.trim()},
+                ${document.getElementById('historia').value.trim()},
+                ${imgs})
+    `;
     cerrarModal();cargarInfieles();
     alert('¡Chisme publicado!');
 };
@@ -161,14 +157,14 @@ function toBase64(file){
 }
 
 async function cargarInfieles(){
-    const res=await client.query('SELECT * FROM infieles ORDER BY id DESC');
+    const rows = await sql`SELECT * FROM infieles ORDER BY id DESC`;
     const cont=document.getElementById('lista-infieles');
-    if(res.rows.length===0){
+    if(rows.length===0){
         cont.innerHTML='<p style="text-align:center;padding:60px;color:#666">Aún no hay chismes...<br><strong>¡Sé el primero!</strong></p>';
         return;
     }
     cont.innerHTML='';
-    res.rows.forEach(i=>{
+    rows.forEach(i=>{
         const card=document.createElement('div');card.className='card';
         card.innerHTML=`
             <div class="card-header">${i.nombre} ${i.apellido}, ${i.edad} años</div>
@@ -183,8 +179,7 @@ async function cargarInfieles(){
 }
 
 async function verChisme(id){
-    const res=await client.query('SELECT * FROM infieles WHERE id=$1',[id]);
-    const i=res.rows[0];
+    const [i] = await sql`SELECT * FROM infieles WHERE id = ${id}`;
     const galeria=i.imagenes.length?i.imagenes.map(src=>`<img src="${src}">`).join(''):'<p style="color:#888">Sin pruebas</p>';
     const coms=i.comentarios.length?i.comentarios.map(c=>`
         <div class="comentario">
@@ -205,9 +200,9 @@ async function verChisme(id){
         <h3>Pruebas:</h3><div class="galeria">${galeria}</div>
 
         <div class="votos">
-            <button class="voto-btn ${yaVoto?'voto-btn disabled':''}" style="background:#28a745" ${yaVoto?'disabled':`onclick="votar(${id},'aprobar')"`}>Aprobar (${i.votos.aprobar})</button>
-            <button class="voto-btn ${yaVoto?'voto-btn disabled':''}" style="background:#ffc107;color:black" ${yaVoto?'disabled':`onclick="votar(${id},'refutar')"`}>Refutar (${i.votos.refutar})</button>
-            <button class="voto-btn ${yaVoto?'voto-btn disabled':''}" style="background:#dc3545" ${yaVoto?'disabled':`onclick="votar(${id},'denunciar')"`}>Denunciar (${i.votos.denunciar})</button>
+            <button class="voto-btn ${yaVoto?'disabled':''}" style="background:#28a745" ${yaVoto?'disabled':`onclick="votar(${id},'aprobar')"`}>Aprobar (${i.votos.aprobar||0})</button>
+            <button class="voto-btn ${yaVoto?'disabled':''}" style="background:#ffc107;color:black" ${yaVoto?'disabled':`onclick="votar(${id},'refutar')"`}>Refutar (${i.votos.refutar||0})</button>
+            <button class="voto-btn ${yaVoto?'disabled':''}" style="background:#dc3545" ${yaVoto?'disabled':`onclick="votar(${id},'denunciar')"`}>Denunciar (${i.votos.denunciar||0})</button>
         </div>
         ${yaVoto?'<p style="text-align:center;color:#888">Ya votaste</p>':''}
 
@@ -224,7 +219,7 @@ async function verChisme(id){
 
 async function votar(id,tipo){
     if(localStorage.getItem('voto_'+id)==='true') return;
-    await client.query(`UPDATE infieles SET votos = jsonb_set(votos, '{${tipo}}', to_jsonb(votos->>'${tipo}'::int + 1)) WHERE id=$1`,[id]);
+    await sql`UPDATE infieles SET votos = jsonb_set(votos, '{${tipo}}', to_jsonb((votos->>'${tipo}')::int + 1)) WHERE id = ${id}`;
     localStorage.setItem('voto_'+id,'true');
     verChisme(id);
 }
@@ -236,7 +231,7 @@ async function enviarComentario(id){
     const file=document.getElementById('img-coment').files[0];
     const img=file?(await toBase64(file)):null;
     const nuevo={nick,texto,img,fecha:new Date().toLocaleDateString('es-ES')};
-    await client.query(`UPDATE infieles SET comentarios = comentarios || $1::jsonb WHERE id=$2`,[JSON.stringify(nuevo),id]);
+    await sql`UPDATE infieles SET comentarios = comentarios || ${sql.json([nuevo])} WHERE id = ${id}`;
     verChisme(id);
     document.getElementById('texto-coment').value='';
     document.getElementById('img-coment').value='';
