@@ -1,11 +1,14 @@
 import { neon } from "@netlify/neon";
 
-const sql = neon(); // Usa NETLIFY_DATABASE_URL automático
-
 export default async (req) => {
   try {
+    const sql = neon(); // ✅ Se crea dentro de la función (mejores conexiones)
+
     if (req.method === "GET") {
-      const rows = await sql`SELECT * FROM infieles ORDER BY id DESC`;
+      const rows = await sql`
+        SELECT * FROM infieles
+        ORDER BY id DESC
+      `;
       return Response.json(rows);
     }
 
@@ -13,7 +16,15 @@ export default async (req) => {
       const data = await req.json();
 
       await sql`
-        INSERT INTO infieles (reportero, nombre, apellido, edad, ubicacion, historia, imagenes)
+        INSERT INTO infieles (
+          reportero,
+          nombre,
+          apellido,
+          edad,
+          ubicacion,
+          historia,
+          imagenes
+        )
         VALUES (
           ${data.reportero},
           ${data.nombre},
@@ -31,6 +42,12 @@ export default async (req) => {
     return new Response("Método no permitido", { status: 405 });
 
   } catch (err) {
-    return new Response(err.message, { status: 500 });
+    return new Response(JSON.stringify({
+      ok: false,
+      error: err.message
+    }), { 
+      status: 500,
+      headers: { "Content-Type": "application/json" }
+    });
   }
 };
