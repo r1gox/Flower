@@ -1,6 +1,11 @@
 {
-  "name": "registro-infieles",
+  "name": "flower",
+  "version": "1.0.0",
   "private": true,
+  "type": "module",
+  "engines": {
+    "node": "20"
+  },
   "dependencies": {
     "@netlify/neon": "^0.10.0"
   }
