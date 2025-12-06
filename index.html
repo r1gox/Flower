@@ -118,144 +118,107 @@
 
 <script>
 // TU CONEXIÓN NEON (passwordless) → 100% compatible con tu tabla actual
-const sql = postgres('postgres://neondb_owner:npg_hrzxHeYuq5I4@ep-cold-voice-aeuzlti2-pooler.us-east-2.aws.neon.tech/neondb?sslmode=require')
-
 function confirmAge(ok){
-    if(ok){
-        document.getElementById('age-modal').classList.remove('active');
-        document.getElementById('main-content').style.display='block';
-        cargarInfieles();
-    }else location.href='https://google.com';
+  if(ok){
+    document.getElementById('age-modal').classList.remove('active');
+    document.getElementById('main-content').style.display='block';
+    cargarInfieles();
+  }else location.href='https://google.com';
 }
 
 document.getElementById('btn-agregar').onclick = () => document.getElementById('modal-form').classList.add('active');
 document.getElementById('btn-legal').onclick = () => document.getElementById('modal-legal').classList.add('active');
+
 function cerrarLegal(){ document.getElementById('modal-legal').classList.remove('active'); }
 function cerrarModal(){ document.getElementById('modal-form').classList.remove('active'); document.getElementById('form-infiel').reset(); }
 function cerrarDetalle(){ document.getElementById('modal-chisme').classList.remove('active'); }
 
-// Publicar chisme
+// ✅ PUBLICAR CHISME (NETLIFY)
 document.getElementById('form-infiel').onsubmit = async e => {
-    e.preventDefault();
-    const files = document.getElementById('pruebas').files;
-    const imgs = [];
-    for(let f of files) if(f.type.startsWith('image/')) imgs.push(await toBase64(f));
+  e.preventDefault();
 
-    await sql`
-        INSERT INTO infieles (reportero, nombre, apellido, edad, ubicacion, historia, imagenes)
-        VALUES (
-            ${document.getElementById('reportero').value.trim() || 'Anónimo'},
-            ${document.getElementById('nombre').value.trim()},
-            ${document.getElementById('apellido').value.trim()},
-            ${document.getElementById('edad').value},
-            ${document.getElementById('ubicacion').value.trim()},
-            ${document.getElementById('historia').value.trim()},
-            ${imgs}
-        )
-    `;
-    cerrarModal();
-    cargarInfieles();
-    alert('¡Chisme publicado con éxito!');
+  const files = document.getElementById('pruebas').files;
+  const imgs = [];
+  for(let f of files) if(f.type.startsWith('image/')) imgs.push(await toBase64(f));
+
+  await fetch('/.netlify/functions/infieles', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({
+      reportero: document.getElementById('reportero').value.trim() || 'Anónimo',
+      nombre: document.getElementById('nombre').value.trim(),
+      apellido: document.getElementById('apellido').value.trim(),
+      edad: document.getElementById('edad').value,
+      ubicacion: document.getElementById('ubicacion').value.trim(),
+      historia: document.getElementById('historia').value.trim(),
+      imagenes: imgs
+    })
+  });
+
+  cerrarModal();
+  cargarInfieles();
+  alert('¡Chisme publicado con éxito!');
 };
 
 function toBase64(file){
-    return new Promise((r,e)=>{const fr=new FileReader();fr.onload=()=>r(fr.result);fr.onerror=e;fr.readAsDataURL(file);});
+  return new Promise((r,e)=>{const fr=new FileReader();fr.onload=()=>r(fr.result);fr.onerror=e;fr.readAsDataURL(file);});
 }
 
-// Cargar lista principal
+// ✅ CARGAR INFIELES (NETLIFY)
 async function cargarInfieles(){
-    const rows = await sql`SELECT * FROM infieles ORDER BY id DESC`;
-    const cont = document.getElementById('lista-infieles');
-    if(rows.length===0){
-        cont.innerHTML='<p style="text-align:center;padding:60px;color:#666">Aún no hay chismes...<br><strong>¡Sé el primero en exponer!</strong></p>';
-        return;
-    }
-    cont.innerHTML='';
-    rows.forEach(i=>{
-        const card=document.createElement('div'); card.className='card';
-        card.innerHTML=`
-            <div class="card-header">${i.nombre} ${i.apellido}, ${i.edad} años</div>
-            <div class="card-body">
-                <div class="info"><strong>Reportado por:</strong> ${i.reportero}</div>
-                <div class="info"><strong>De:</strong> ${i.ubicacion}</div>
-                <button class="btn-ver" onclick="verChisme(${i.id})">
-                    Ver todo el chisme ${i.imagenes.length?`(${i.imagenes.length} fotos)`:''}
-                </button>
-            </div>
-        `;
-        cont.appendChild(card);
-    });
-}
+  const res = await fetch('/.netlify/functions/infieles');
+  const rows = await res.json();
 
-// Ver detalle completo
-async function verChisme(id){
-    const [i] = await sql`SELECT * FROM infieles WHERE id = ${id}`;
-    const galeria = i.imagenes.length ? i.imagenes.map(src=>`<img src="${src}">`).join('') : '<p style="color:#888">Sin pruebas visuales</p>';
-    const coms = i.comentarios.length ? i.comentarios.map(c=>`
-        <div class="comentario">
-            <strong>${c.nick||'Anónimo'}:</strong> ${c.texto.replace(/\n/g,'<br>')}
-            ${c.img?`<img src="${c.img}">`:''}
-            <small>${c.fecha}</small>
-        </div>
-    `).join('') : '<p style="color:#888">Aún no hay comentarios</p>';
+  const cont = document.getElementById('lista-infieles');
 
-    const yaVoto = localStorage.getItem('voto_'+id) === 'true';
+  if(!rows.length){
+    cont.innerHTML='<p style="text-align:center;padding:60px;color:#666">Aún no hay chismes...</p>';
+    return;
+  }
 
-    document.getElementById('detalle-chisme').innerHTML = `
-        <h2>${i.nombre} ${i.apellido}</h2>
-        <p><strong>Reportado por:</strong> ${i.reportero}</p>
-        <p><strong>Ubicación:</strong> ${i.ubicacion}</p>
-        <hr>
-        <p style="background:#f1f3f5;padding:18px;border-radius:12px">${i.historia.replace(/\n/g,'<br>')}</p>
-        <h3>Pruebas:</h3>
-        <div class="galeria">${galeria}</div>
-
-        <div class="votos">
-            <button class="voto-btn ${yaVoto?'disabled':''}" style="background:#28a745" ${yaVoto?'disabled':`onclick="votar(${id},'aprobar')"`}>Aprobar (${i.votos.aprobar||0})</button>
-            <button class="voto-btn ${yaVoto?'disabled':''}" style="background:#ffc107;color:black" ${yaVoto?'disabled':`onclick="votar(${id},'refutar')"`}>Refutar (${i.votos.refutar||0})</button>
-            <button class="voto-btn ${yaVoto?'disabled':''}" style="background:#dc3545" ${yaVoto?'disabled':`onclick="votar(${id},'denunciar')"`}>Denunciar (${i.votos.denunciar||0})</button>
-        </div>
-        ${yaVoto?'<p style="text-align:center;color:#888;margin:10px 0">Ya votaste en este chisme</p>':''}
-
-        <div class="comentarios">
-            <h3>Comentarios y más pruebas</h3>
-            ${coms}
-            <input type="text" id="nick-coment" placeholder="Tu nick (opcional)">
-            <textarea id="texto-coment" placeholder="Escribe tu comentario..." rows="3"></textarea>
-            <input type="file" id="img-coment" accept="image/*">
-            <button class="btn btn-azul" onclick="enviarComentario(${id})">Enviar Comentario</button>
-        </div>
+  cont.innerHTML='';
+  rows.forEach(i=>{
+    const card=document.createElement('div');
+    card.className='card';
+    card.innerHTML=`
+      <div class="card-header">${i.nombre} ${i.apellido}, ${i.edad} años</div>
+      <div class="card-body">
+        <div class="info"><strong>Reportado por:</strong> ${i.reportero}</div>
+        <div class="info"><strong>De:</strong> ${i.ubicacion}</div>
+        <button class="btn-ver" onclick="verChisme(${i.id})">Ver todo el chisme</button>
+      </div>
     `;
-    document.getElementById('modal-chisme').classList.add('active');
+    cont.appendChild(card);
+  });
 }
 
-// Votar (solo 1 vez por persona)
-async function votar(id, tipo){
-    if(localStorage.getItem('voto_'+id)==='true') return;
-    await sql`UPDATE infieles SET votos = jsonb_set(votos, '{${tipo}}', to_jsonb((votos->>'${tipo}')::int + 1)) WHERE id = ${id}`;
-    localStorage.setItem('voto_'+id,'true');
-    verChisme(id);
-}
+// ✅ VER CHISME COMPLETO
+async function verChisme(id){
+  const res = await fetch('/.netlify/functions/infieles?id=' + id);
+  const i = await res.json();
 
-// Enviar comentario
-async function enviarComentario(id){
-    const nick = document.getElementById('nick-coment').value.trim() || null;
-    const texto = document.getElementById('texto-coment').value.trim();
-    if(!texto) return alert('Escribe algo');
-    const file = document.getElementById('img-coment').files[0];
-    const img = file ? (await toBase64(file)) : null;
-    const nuevoComentario = {nick, texto, img, fecha: new Date().toLocaleDateString('es-ES')};
+  const galeria = i.imagenes.length ? i.imagenes.map(src=>`<img src="${src}">`).join('') : '<p style="color:#888">Sin pruebas visuales</p>';
 
-    await sql`UPDATE infieles SET comentarios = comentarios || ${sql.json([nuevoComentario])} WHERE id = ${id}`;
-    verChisme(id);
-    document.getElementById('texto-coment').value='';
-    document.getElementById('img-coment').value='';
+  document.getElementById('detalle-chisme').innerHTML = `
+    <h2>${i.nombre} ${i.apellido}</h2>
+    <p><strong>Reportado por:</strong> ${i.reportero}</p>
+    <p><strong>Ubicación:</strong> ${i.ubicacion}</p>
+    <hr>
+    <p style="background:#f1f3f5;padding:18px;border-radius:12px">${i.historia.replace(/\n/g,'<br>')}</p>
+    <h3>Pruebas:</h3>
+    <div class="galeria">${galeria}</div>
+  `;
+
+  document.getElementById('modal-chisme').classList.add('active');
 }
 
 function filtrar(){
-    const txt = document.getElementById('search-input').value.toLowerCase();
-    document.querySelectorAll('.card').forEach(c=>c.style.display=c.textContent.toLowerCase().includes(txt)?'flex':'none');
+  const txt = document.getElementById('search-input').value.toLowerCase();
+  document.querySelectorAll('.card').forEach(c=>{
+    c.style.display=c.textContent.toLowerCase().includes(txt)?'flex':'none';
+  });
 }
 </script>
 </body>
 </html>
+
