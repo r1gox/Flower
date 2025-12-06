@@ -1,60 +1,58 @@
-import { neon } from "@netlify/neon";
+export async function handler(event) {
+  const DB = process.env.NETLIFY_DATABASE_URL;
 
-const sql = neon(); // usa NETLIFY_DATABASE_URL automático
+  // ✅ GET → obtener chismes
+  if (event.httpMethod === "GET") {
+    const id = event.queryStringParameters?.id;
 
-export default async (req) => {
-  try {
+    const res = await fetch(DB, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sql: id
+          ? "SELECT * FROM infieles WHERE id = $1"
+          : "SELECT * FROM infieles ORDER BY id DESC",
+        params: id ? [id] : []
+      })
+    });
 
-    // ✅ OBTENER TODOS LOS CHISMES
-    if (req.method === "GET" && !req.queryStringParameters?.id) {
-      const rows = await sql`
-        SELECT * FROM infieles
-        ORDER BY id DESC
-      `;
-      return Response.json(rows);
-    }
-
-    // ✅ OBTENER UN SOLO CHISME POR ID
-    if (req.method === "GET" && req.queryStringParameters?.id) {
-      const { id } = req.queryStringParameters;
-
-      const [row] = await sql`
-        SELECT * FROM infieles WHERE id = ${id}
-      `;
-
-      if (!row) {
-        return new Response("No encontrado", { status: 404 });
-      }
-
-      return Response.json(row);
-    }
-
-    // ✅ INSERTAR NUEVO CHISME
-    if (req.method === "POST") {
-      const data = await req.json();
-
-      await sql`
-        INSERT INTO infieles
-        (reportero, nombre, apellido, edad, ubicacion, historia, imagenes)
-        VALUES
-        (
-          ${data.reportero},
-          ${data.nombre},
-          ${data.apellido},
-          ${data.edad},
-          ${data.ubicacion},
-          ${data.historia},
-          ${JSON.stringify(data.imagenes)}
-        )
-      `;
-
-      return Response.json({ ok: true });
-    }
-
-    return new Response("Método no permitido", { status: 405 });
-
-  } catch (err) {
-    console.error(err);
-    return new Response(err.message, { status: 500 });
+    const data = await res.json();
+    return {
+      statusCode: 200,
+      body: JSON.stringify(id ? data[0] : data)
+    };
   }
-};
+
+  // ✅ POST → guardar chisme
+  if (event.httpMethod === "POST") {
+    const body = JSON.parse(event.body);
+
+    await fetch(DB, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sql: `
+          INSERT INTO infieles
+          (reportero, nombre, apellido, edad, ubicacion, historia, imagenes)
+          VALUES ($1,$2,$3,$4,$5,$6,$7)
+        `,
+        params: [
+          body.reportero,
+          body.nombre,
+          body.apellido,
+          body.edad,
+          body.ubicacion,
+          body.historia,
+          JSON.stringify(body.imagenes)
+        ]
+      })
+    });
+
+    return {
+      statusCode: 200,
+      body: JSON.stringify({ ok: true })
+    };
+  }
+
+  return { statusCode: 405, body: "Method Not Allowed" };
+}
