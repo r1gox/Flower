@@ -1,180 +1,223 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8">
-<title>Registro Nacional de Infieles</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-<style>
-:root{--azul:#007bff;--rojo:#dc3545;--naranja:#fd7e14;--fondo:#f8f9fa;--blanco:#fff;--gris:#6c757d}
-*{margin:0;padding:0;box-sizing:border-box}
-body{font-family:system-ui;max-width:500px;margin:auto;background:#f8f9fa}
-
-header{text-align:center;padding:30px;background:white}
-.btn{padding:14px;border:none;border-radius:10px;font-weight:bold;width:100%;margin-top:10px}
-.btn-azul{background:#007bff;color:white}
-.btn-rojo{background:#dc3545;color:white}
-.btn-naranja{background:#fd7e14;color:white}
-
-.card{background:white;border-radius:15px;margin:15px;overflow:hidden;box-shadow:0 4px 18px rgba(0,0,0,.1)}
-.card-header{background:#007bff;color:white;padding:15px;text-align:center}
-.card-body{padding:15px}
-
-.modal{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.9);justify-content:center;align-items:center;z-index:5}
-.modal.active{display:flex}
-.modal-content{background:white;width:100%;height:95vh;border-radius:20px;overflow:auto;padding:20px}
-
-.galeria img{width:100%;border-radius:10px;margin:10px 0}
-.barra{height:10px;border-radius:10px;background:#eee;overflow:hidden;margin:6px 0}
-.barra span{display:block;height:100%}
-
-.comentario{background:#f1f3f5;padding:12px;border-radius:10px;margin:10px 0}
-
-.progreso{display:none;text-align:center;padding:10px;font-weight:bold}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registro Nacional de Infieles</title>
+    <style>
+        :root{--azul:#007bff;--rojo:#dc3545;--fondo:#f8f9fa;--blanco:#fff;--gris:#6c757d;--texto:#212529}
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:system-ui,Arial,sans-serif;background:var(--fondo);color:var(--texto);max-width:500px;margin:0 auto;min-height:100vh}
+        #solo-pc{display:none;text-align:center;padding:60px;background:#fff;min-height:100vh;font-size:1.3em}
+        @media(min-width:768px){body>*:not(#solo-pc){display:none}#solo-pc{display:block}}
+        header{text-align:center;padding:35px 15px;background:var(--blanco);border-bottom:5px solid var(--azul);box-shadow:0 3px 10px rgba(0,123,255,.15)}
+        h1{font-size:2.1em;color:var(--azul)}
+        .btn{padding:15px 20px;font-size:1.05em;border:none;border-radius:10px;cursor:pointer;font-weight:bold;margin:12px 10px;width:88%}
+        .btn-azul{background:var(--azul);color:white}
+        .btn-rojo{background:var(--rojo);color:white}
+        .btn-ver{width:100%;padding:16px;background:var(--azul);color:white;border:none;border-radius:10px;font-size:1.1em;margin-top:12px}
+        #search-section{padding:25px 15px;background:var(--blanco);text-align:center}
+        #search-input{width:94%;padding:16px;border:2px solid #ced4da;border-radius:30px;font-size:1.1em;text-align:center}
+        #lista-infieles{padding:10px;display:flex;flex-direction:column;gap:18px}
+        .card{background:var(--blanco);border-radius:14px;overflow:hidden;box-shadow:0 4px 18px rgba(0,0,0,.1);border:1px solid #e9ecef}
+        .card-header{background:var(--azul);color:white;padding:18px;text-align:center;font-size:1.25em;font-weight:bold}
+        .card-body{padding:18px}
+        .info{margin:10px 0;color:var(--gris)}
+        .info strong{color:var(--texto)}
+        .modal{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.8);z-index:1000;justify-content:center;align-items:center;padding:15px}
+        .modal.active{display:flex}
+        .modal-content{background:white;border-radius:14px;padding:25px;width:100%;max-height:92vh;overflow-y:auto;position:relative}
+        .close{position:absolute;top:10px;right:15px;font-size:32px;cursor:pointer;color:#999}
+        .galeria img,.comentario img{width:100%!important;height:auto!important;border-radius:10px;margin:12px 0;display:block;box-shadow:0 2px 10px rgba(0,0,0,.15)}
+        label{display:block;margin:18px 0 8px;font-weight:bold}
+        input,textarea{width:100%;padding:14px;border:1.5px solid #ddd;border-radius:10px;font-size:1em}
+        textarea{min-height:120px}
+        .votos{display:flex;gap:10px;margin:25px 0}
+        .voto-btn{flex:1;padding:14px;border-radius:10px;color:white;border:none;font-weight:bold}
+        .voto-btn.disabled{background:#ccc!important;cursor:not-allowed!important}
+        .comentarios{margin-top:30px;border-top:2px solid #eee;padding-top:20px}
+        .comentario{background:#f8f9fa;padding:15px;border-radius:10px;margin:15px 0;border-left:4px solid var(--azul)}
+    </style>
 </head>
-
 <body>
 
-<header>
-<h1>Registro de Infieles</h1>
-<button class="btn btn-azul" onclick="document.getElementById('modal-form').classList.add('active')">+ Exponer</button>
-</header>
+<div id="solo-pc">
+    <h2>Este sitio es solo para celulares</h2>
+    <p>Abre desde tu teléfono</p>
+</div>
 
-<div id="lista-infieles"></div>
+<div id="age-modal" class="modal active">
+    <div class="modal-content">
+        <h2>Confirmación de Edad</h2>
+        <p>Este contenido es solo para mayores de 18 años</p>
+        <button class="btn btn-azul" onclick="confirmAge(true)">Sí, tengo 18+</button>
+        <button class="btn btn-rojo" onclick="confirmAge(false)">No</button>
+    </div>
+</div>
 
-<!-- FORM -->
+<div id="main-content" style="display:none;">
+    <header>
+        <h1>Registro de Infieles</h1>
+        <p>El chisme que todos quieren ver</p>
+        <button class="btn btn-azul" id="btn-agregar">+ Exponer Infiel</button>
+        <button class="btn btn-rojo" id="btn-legal">Información Legal Importante</button>
+    </header>
+    <section id="search-section">
+        <input type="text" id="search-input" placeholder="Buscar por nombre o ciudad..." onkeyup="filtrar()">
+    </section>
+    <div id="lista-infieles"></div>
+</div>
+
+<!-- Modal Formulario -->
 <div id="modal-form" class="modal">
-<div class="modal-content">
-<button class="btn btn-rojo" onclick="cerrarModal()">Cerrar</button>
-
-<form id="form-infiel">
-<input id="reportero" placeholder="Tu nick (opcional)">
-<input id="nombre" placeholder="Nombre" required>
-<input id="apellido" placeholder="Apellido" required>
-<input id="edad" type="number" placeholder="Edad" required>
-<input id="ubicacion" placeholder="Dónde vive" required>
-<textarea id="historia" placeholder="Detalles completos" required></textarea>
-<input type="file" id="pruebas" multiple>
-
-<div id="progreso" class="progreso">Subiendo pruebas...</div>
-
-<button class="btn btn-azul">Publicar Chisme</button>
-</form>
+    <div class="modal-content">
+        <span class="close" onclick="cerrarModal()">×</span>
+        <h2>Nuevo Chisme</h2>
+        <form id="form-infiel">
+            <label>Tu nick (opcional - si no pones, serás Anónimo)</label>
+            <input type="text" id="reportero">
+            <label>Nombre del infiel</label>
+            <input type="text" id="nombre" required>
+            <label>Apellido</label>
+            <input type="text" id="apellido" required>
+            <label>Edad</label>
+            <input type="number" id="edad" min="18" required>
+            <label>De dónde es</label>
+            <input type="text" id="ubicacion" required>
+            <label>Todo el chisme (detalles completos)</label>
+            <textarea id="historia" required></textarea>
+            <label>Pruebas (fotos)</label>
+            <input type="file" id="pruebas" accept="image/*" multiple>
+            <button type="submit" class="btn btn-azul" style="margin-top:20px">Publicar Chisme</button>
+        </form>
+    </div>
 </div>
-</div>
 
-<!-- DETALLE -->
+<!-- Modal Detalle -->
 <div id="modal-chisme" class="modal">
-<div class="modal-content">
-<button class="btn btn-rojo" onclick="cerrarDetalle()">Cerrar</button>
-<div id="detalle-chisme"></div>
+    <div class="modal-content">
+        <span class="close" onclick="cerrarDetalle()">×</span>
+        <div id="detalle-chisme"></div>
+    </div>
 </div>
+
+<!-- Modal Legal -->
+<div id="modal-legal" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="cerrarLegal()">×</span>
+        <h2>Información Legal Importante</h2>
+        <p><strong>Este sitio es de entretenimiento y sátira.</strong></p>
+        <p>Todas las historias son consideradas <strong>ficticias</strong> salvo prueba legal en contrario.</p>
+        <p>Prohibido: datos de menores, pornografía de venganza, acoso.</p>
+        <p>Usas bajo tu propia responsabilidad.</p>
+        <button class="btn btn-rojo" onclick="cerrarLegal()" style="margin-top:20px">Entendido</button>
+    </div>
 </div>
 
 <script>
-function cerrarModal(){document.getElementById('modal-form').classList.remove('active')}
-function cerrarDetalle(){document.getElementById('modal-chisme').classList.remove('active')}
-
-document.getElementById('form-infiel').onsubmit=async e=>{
-e.preventDefault()
-document.getElementById('progreso').style.display="block"
-
-const files=[...pruebas.files]
-const imgs=[]
-for(let f of files){
-const fr=new FileReader()
-await new Promise(r=>{
-fr.onload=()=>{imgs.push(fr.result);r()}
-fr.readAsDataURL(f)
-})
+// TU CONEXIÓN NEON (passwordless) → 100% compatible con tu tabla actual
+function confirmAge(ok){
+  if(ok){
+    document.getElementById('age-modal').classList.remove('active');
+    document.getElementById('main-content').style.display='block';
+    cargarInfieles();
+  }else location.href='https://google.com';
 }
 
-await fetch('/.netlify/functions/infieles',{
-method:"POST",
-headers:{'Content-Type':'application/json'},
-body:JSON.stringify({
-reportero:reportero.value||"Anónimo",
-nombre:nombre.value,
-apellido:apellido.value,
-edad:edad.value,
-ubicacion:ubicacion.value,
-historia:historia.value,
-imagenes:imgs
-})
-})
+document.getElementById('btn-agregar').onclick = () => document.getElementById('modal-form').classList.add('active');
+document.getElementById('btn-legal').onclick = () => document.getElementById('modal-legal').classList.add('active');
 
-document.getElementById('progreso').style.display="none"
-cerrarModal()
-cargarInfieles()
-alert("Publicado correctamente")
+function cerrarLegal(){ document.getElementById('modal-legal').classList.remove('active'); }
+function cerrarModal(){ document.getElementById('modal-form').classList.remove('active'); document.getElementById('form-infiel').reset(); }
+function cerrarDetalle(){ document.getElementById('modal-chisme').classList.remove('active'); }
+
+// ✅ PUBLICAR CHISME (NETLIFY)
+document.getElementById('form-infiel').onsubmit = async e => {
+  e.preventDefault();
+
+  const files = document.getElementById('pruebas').files;
+  const imgs = [];
+  for(let f of files) if(f.type.startsWith('image/')) imgs.push(await toBase64(f));
+
+  await fetch('/.netlify/functions/infieles', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({
+      reportero: document.getElementById('reportero').value.trim() || 'Anónimo',
+      nombre: document.getElementById('nombre').value.trim(),
+      apellido: document.getElementById('apellido').value.trim(),
+      edad: document.getElementById('edad').value,
+      ubicacion: document.getElementById('ubicacion').value.trim(),
+      historia: document.getElementById('historia').value.trim(),
+      imagenes: imgs
+    })
+  });
+
+  cerrarModal();
+  cargarInfieles();
+  alert('¡Chisme publicado con éxito!');
+};
+
+function toBase64(file){
+  return new Promise((r,e)=>{const fr=new FileReader();fr.onload=()=>r(fr.result);fr.onerror=e;fr.readAsDataURL(file);});
 }
 
+// ✅ CARGAR INFIELES (NETLIFY)
 async function cargarInfieles(){
-const r=await fetch('/.netlify/functions/infieles')
-const rows=await r.json()
-const cont=document.getElementById('lista-infieles')
-cont.innerHTML=""
-rows.forEach(i=>{
-cont.innerHTML+=`
-<div class="card">
-<div class="card-header">${i.nombre} ${i.apellido}</div>
-<div class="card-body">
-<p><b>De:</b> ${i.ubicacion}</p>
-<button class="btn btn-azul" onclick="verChisme(${i.id})">Ver todo el chisme</button>
-</div>
-</div>`
-})
+  const res = await fetch('/.netlify/functions/infieles');
+  const rows = await res.json();
+
+  const cont = document.getElementById('lista-infieles');
+
+  if(!rows.length){
+    cont.innerHTML='<p style="text-align:center;padding:60px;color:#666">Aún no hay chismes...</p>';
+    return;
+  }
+
+  cont.innerHTML='';
+  rows.forEach(i=>{
+    const card=document.createElement('div');
+    card.className='card';
+    card.innerHTML=`
+      <div class="card-header">${i.nombre} ${i.apellido}, ${i.edad} años</div>
+      <div class="card-body">
+        <div class="info"><strong>Reportado por:</strong> ${i.reportero}</div>
+        <div class="info"><strong>De:</strong> ${i.ubicacion}</div>
+        <button class="btn-ver" onclick="verChisme(${i.id})">Ver todo el chisme</button>
+      </div>
+    `;
+    cont.appendChild(card);
+  });
 }
 
+// ✅ VER CHISME COMPLETO
 async function verChisme(id){
-const r=await fetch('/.netlify/functions/infieles?id='+id)
-const i=await r.json()
+  const res = await fetch('/.netlify/functions/infieles?id=' + id);
+  const i = await res.json();
 
-const total=i.aprobados+i.refutados+i.denunciados||1
-const pA=(i.aprobados/total*100).toFixed(0)
-const pR=(i.refutados/total*100).toFixed(0)
-const pD=(i.denunciados/total*100).toFixed(0)
+  const galeria = i.imagenes.length ? i.imagenes.map(src=>`<img src="${src}">`).join('') : '<p style="color:#888">Sin pruebas visuales</p>';
 
-document.getElementById('detalle-chisme').innerHTML=`
-<h2>${i.nombre} ${i.apellido}</h2>
+  document.getElementById('detalle-chisme').innerHTML = `
+    <h2>${i.nombre} ${i.apellido}</h2>
+    <p><strong>Reportado por:</strong> ${i.reportero}</p>
+    <p><strong>Ubicación:</strong> ${i.ubicacion}</p>
+    <hr>
+    <p style="background:#f1f3f5;padding:18px;border-radius:12px">${i.historia.replace(/\n/g,'<br>')}</p>
+    <h3>Pruebas:</h3>
+    <div class="galeria">${galeria}</div>
+  `;
 
-<p><b>Ubicación:</b> ${i.ubicacion}</p>
-<p><b>Privacidad:</b> Identidad protegida</p>
-
-<h3>Detalles</h3>
-<p>${i.historia}</p>
-
-<h3>Pruebas iniciales</h3>
-<div class="galeria">${(i.imagenes||[]).map(img=>`<img src="${img}">`).join("")}</div>
-
-<h3>Votación</h3>
-<div class="barra"><span style="width:${pA}%;background:green"></span></div>
-<div class="barra"><span style="width:${pR}%;background:#fd7e14"></span></div>
-<div class="barra"><span style="width:${pD}%;background:red"></span></div>
-
-<button class="btn btn-azul">Aprobar</button>
-<button class="btn btn-naranja">Refutar</button>
-<button class="btn btn-rojo">Denunciar</button>
-
-<h3>Comentarios</h3>
-<div>${(i.comentarios||[]).map(c=>`
-<div class="comentario">
-<b>${c.nick}</b><br>${c.texto}
-${c.img?`<img src="${c.img}" style="width:100%">`:""}
-</div>`).join("")}</div>
-
-<input placeholder="Tu nick (opcional)">
-<textarea placeholder="Comentario"></textarea>
-<input type="file">
-<button class="btn btn-azul">Enviar comentario</button>
-`
-
-document.getElementById('modal-chisme').classList.add('active')
+  document.getElementById('modal-chisme').classList.add('active');
 }
 
-cargarInfieles()
+function filtrar(){
+  const txt = document.getElementById('search-input').value.toLowerCase();
+  document.querySelectorAll('.card').forEach(c=>{
+    c.style.display=c.textContent.toLowerCase().includes(txt)?'flex':'none';
+  });
+}
 </script>
-
 </body>
 </html>
+
+
